@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <title>Assistant AI - Flask + OpenRouter</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            font: .9em/1.5 'Roboto', sans-serif;
+            cursor: default;
+            background: #f9f9f9;
+        }
+        
+        .box {
+            width: 90%;
+            max-width: 500px;
+            margin: 2em auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        
+        .title {
+            text-align: center;
+            margin-bottom: 1.5em;
+            color: #333;
+            font-size: 1.2em;
+        }
+        
+        .message-container {
+            max-height: 350px;
+            overflow-y: auto;
+            margin-bottom: 1em;
+            padding-right: 5px;
+        }
+        
+        .message {
+            width: calc(100% - 60px);
+            border-radius: 15px;
+            padding: 1em;
+            margin-bottom: 1em;
+            word-wrap: break-word;
+        }
+        
+        .person-a {
+            display: flex;
+            align-items: flex-end;
+        }
+        
+        .person-a .message {
+            background: #f8f8f8;
+        }
+        
+        .icon {
+            --size: 90px;
+            width: var(--size);
+            height: var(--size);
+            background: url('/static/images/kawaii.jpg') no-repeat;
+            background-position: center top;
+            background-size: cover;
+            border-radius: 100%;
+            margin-right: .8em;
+            position: relative;
+        }
+        
+        .icon::after {
+            content: ' ';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: lightgreen;
+            border-radius: 100%;
+            bottom: 0;
+            right: 0;
+        }
+        
+        .person-b .message {
+            background: lightblue;
+            margin: 0.5em 0;
+            margin-left: 60px;
+            color: white;
+            text-align: right;
+        }
+        
+        .message svg {
+            height: 26px;
+            vertical-align: middle;
+        }
+        
+        .last {
+            width: auto;
+        }
+        
+        .input-area {
+            display: flex;
+            margin-top: 1em;
+        }
+        
+        #message {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-family: 'Roboto', sans-serif;
+            resize: none;
+            margin-right: 10px;
+        }
+        
+        #message:focus {
+            outline: none;
+            border-color: lightblue;
+        }
+        
+        button {
+            background: lightblue;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 0 20px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #69b9d3;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 10px;
+        }
+        
+        /* Pour votre image d'assistant animé */
+        .assistant-avatar {
+            --size: 120px;
+            width: 300px;
+            height: var(--size);
+            background-image: url('/static/images/discu-removebg-preview.png');
+            background-position: center; /* Aligne le haut de l'image */
+            background-size: cover;
+            border-radius: 10px;
+            margin: 0 auto 15px auto;
+            border: 3px solid lightblue;
+        }
+
+        /* Scrollbar personnalisée */
+        .message-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .message-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .message-container::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 10px;
+        }
+        
+        .message-container::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="assistant-avatar"></div>
+        <div class="title">Pose ta question à l'Assistant</div>
+        
+        <div class="message-container" id="message-container">
+            <!-- Les messages s'afficheront ici -->
+        </div>
+        
+        <div class="input-area">
+            <textarea id="message" rows="2" placeholder="Tape ici ta question..."></textarea>
+            <button onclick="askAssistant()">Envoyer</button>
+        </div>
+    </div>
+
+    <script>
+        async function askAssistant() {
+            const messageInput = document.getElementById("message");
+            const messageText = messageInput.value;
+            const messageContainer = document.getElementById("message-container");
+            
+            if (!messageText.trim()) {
+                return;
+            }
+            
+            // Afficher le message de l'utilisateur
+            messageContainer.innerHTML += `
+                <div class="person-b">
+                    <div class="message">
+                        ${messageText}
+                    </div>
+                </div>
+            `;
+            
+            // Effacer le champ de saisie
+            messageInput.value = '';
+            
+            // Faire défiler vers le bas
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+            
+            // Afficher l'indicateur de chargement
+            messageContainer.innerHTML += `
+                <div class="loading">L'assistant réfléchit...</div>
+            `;
+            
+            try {
+                const res = await fetch("/ask", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ message: messageText })
+                });
+                
+                const data = await res.json();
+                
+                // Supprimer l'indicateur de chargement
+                const loadingElement = document.querySelector(".loading");
+                if (loadingElement) {
+                    messageContainer.removeChild(loadingElement);
+                }
+                
+                if (data.response) {
+                    // Afficher la réponse de l'assistant
+                    messageContainer.innerHTML += `
+                        <div class="person-a">
+                            <div class="icon"></div>
+                            <div class="message">
+                                ${data.response}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Afficher un message d'erreur
+                    messageContainer.innerHTML += `
+                        <div class="person-a">
+                            <div class="icon"></div>
+                            <div class="message">
+                                <span style="color:red;">Erreur : ${data.error}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                // Supprimer l'indicateur de chargement
+                const loadingElement = document.querySelector(".loading");
+                if (loadingElement) {
+                    messageContainer.removeChild(loadingElement);
+                }
+                
+                // Afficher une erreur de réseau
+                messageContainer.innerHTML += `
+                    <div class="person-a">
+                        <div class="icon"></div>
+                        <div class="message">
+                            <span style="color:red;">Erreur réseau</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Faire défiler vers le bas après avoir ajouté la réponse
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+        
+        // Permettre l'envoi avec la touche Entrée
+        document.getElementById("message").addEventListener("keypress", function(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                askAssistant();
+            }
+        });
+    </script>
+</body>
+</html>
